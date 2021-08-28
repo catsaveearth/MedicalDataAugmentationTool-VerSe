@@ -1,14 +1,23 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Conv3D, AveragePooling3D, AlphaDropout, Activation, Dropout
-from tensorflow.keras.regularizers import l2
-from tensorflow_train_v2.layers.initializers import he_initializer, selu_initializer
-from tensorflow_train_v2.layers.layers import Sequential, ConcatChannels, UpSampling3DLinear, UpSampling3DCubic
-from tensorflow_train_v2.networks.unet_base import UnetBase
+from tensorflow.keras.layers import Conv3D, AveragePooling3D, AlphaDropout, Activation, Dropout 
+# tf.keras.layers로부터 3d convolution, 3d average pooling, alpha dropout, activation, dropout layer를 불러옴
 
+from tensorflow.keras.regularizers import l2
+# tf.keras.regularizers로부터 l2 norm 정규화 모듈(?)을 불러옴
+
+from tensorflow_train_v2.layers.initializers import he_initializer, selu_initializer
+# tensorflow_train_v2? 검색해도 안나오는데 그냥 TF2라고 생각하면 될듯? 거기서 initializer 두개를 불러옴
+
+from tensorflow_train_v2.layers.layers import Sequential, ConcatChannels, UpSampling3DLinear, UpSampling3DCubic
+# tf2에서 sequential, concatchannels, upsampling 3d linear, upsampling 3d cubic을 불러옴 => u-net에 필요한 친구들
+
+from tensorflow_train_v2.networks.unet_base import UnetBase
+# tf2에서 UnetBaes를 불러옴.
 
 class UnetAvgLinear3D(UnetBase):
     """
     U-Net with average pooling and linear upsampling.
+    u-net class인데 average pooling과 linear upsampling으로 구성된 네트워크 클래스.
     """
     def __init__(self,
                  num_filters_base,
@@ -21,6 +30,8 @@ class UnetAvgLinear3D(UnetBase):
                  data_format='channels_first',
                  padding='same',
                  *args, **kwargs):
+
+        #클래스 인자 하나씩 매칭시켜주기
         super(UnetAvgLinear3D, self).__init__(*args, **kwargs)
         self.num_filters_base = num_filters_base
         self.repeats = repeats
@@ -33,7 +44,7 @@ class UnetAvgLinear3D(UnetBase):
         self.padding = padding
         self.init_layers()
 
-    def downsample(self, current_level):
+    def downsample(self, current_level): #u-net의 왼쪽부분 구성(크기 감소)
         """
         Create and return downsample keras layer for the current level.
         :param current_level: The current level.
@@ -41,7 +52,7 @@ class UnetAvgLinear3D(UnetBase):
         """
         return AveragePooling3D([2] * 3, data_format=self.data_format)
 
-    def upsample(self, current_level):
+    def upsample(self, current_level): #u-net의 오른쪽 부분 구성 (크기 증가)
         """
         Create and return upsample keras layer for the current level.
         :param current_level: The current level.
@@ -49,7 +60,7 @@ class UnetAvgLinear3D(UnetBase):
         """
         return UpSampling3DLinear([2] * 3, data_format=self.data_format)
 
-    def combine(self, current_level):
+    def combine(self, current_level): #u-net의 사이 (skip-connection) 를 구현 (왼쪽의 기존 크기의 얘 + 오른쪽의 upsampling된 얘)
         """
         Create and return combine keras layer for the current level.
         :param current_level: The current level.
@@ -58,23 +69,26 @@ class UnetAvgLinear3D(UnetBase):
         return ConcatChannels(data_format=self.data_format)
         # return Add()
 
+    #아래 두 block 코드는 마지막 sequential의 name부분을 제외하면 코드가 똑같음
     def contracting_block(self, current_level):
         """
+        #왼쪽의 contracting path를 구성하는 block들
         Create and return the contracting block keras layer for the current level.
         :param current_level: The current level.
         :return: The keras.layers.Layer.
         """
         layers = []
-        for i in range(self.repeats):
+        for i in range(self.repeats): #convolution을 몇번 반복하는지
             layers.append(self.conv(current_level, str(i)))
-            if self.alpha_dropout:
+            if self.alpha_dropout: #drop out 종류에 따라 맞는 얘를 넣어주기
                 layers.append(AlphaDropout(self.dropout_ratio))
             else:
                 layers.append(Dropout(self.dropout_ratio))
-        return Sequential(layers, name='contracting' + str(current_level))
+        return Sequential(layers, name='contracting' + str(current_level)) #그 level에 맞는 레이어 시퀸스가 뚝딱!
 
     def expanding_block(self, current_level):
         """
+        #오른쪽의 expanding path를 구성하는 block들
         Create and return the expanding block keras layer for the current level.
         :param current_level: The current level.
         :return: The keras.layers.Layer.
@@ -90,6 +104,7 @@ class UnetAvgLinear3D(UnetBase):
 
     def conv(self, current_level, postfix):
         """
+        3D convolution 코드!
         Create and return a convolution layer for the current level with the current postfix.
         :param current_level: The current level.
         :param postfix:
@@ -108,8 +123,11 @@ class UnetAvgLinear3D(UnetBase):
 def activation_fn_output_kernel_initializer(activation):
     """
     Return actual activation function and kernel initializer.
+    활성화 함수와 커널 initializer를 리턴함.
     :param activation: Activation function string.
     :return: activation_fn, kernel_initializer
+
+    6가지 종류를 제공
     """
     if activation == 'none':
         activation_fn = None
@@ -138,6 +156,7 @@ def activation_fn_output_kernel_initializer(activation):
     return activation_fn, kernel_initializer
 
 
+#vertebra localization에 쓰이는 친구
 class SpatialConfigurationNet(tf.keras.Model):
     """
     The SpatialConfigurationNet.
@@ -216,6 +235,7 @@ class SpatialConfigurationNet(tf.keras.Model):
 class Unet(tf.keras.Model):
     """
     The Unet.
+    그냥 U-net
     """
     def __init__(self,
                  num_labels,
@@ -229,13 +249,13 @@ class Unet(tf.keras.Model):
                  **kwargs):
         """
         Initializer.
-        :param num_labels: Number of outputs.
+        :param num_labels: Number of outputs. 아웃풋 라벨의 수
         :param num_filters_base: Number of filters for the local appearance and spatial configuration sub-networks.
-        :param num_levels: Number of levels for the local appearance and spatial configuration sub-networks.
-        :param activation: Activation of the convolution layers ('relu', 'lrelu', or 'selu').
-        :param data_format: 'channels_first' or 'channels_last'
+        :param num_levels: Number of levels for the local appearance and spatial configuration sub-networks. u-net 단계 (level)의 수
+        :param activation: Activation of the convolution layers ('relu', 'lrelu', or 'selu'). 활성화함수 종류
+        :param data_format: 'channels_first' or 'channels_last' 데이터포맷 NCHW인지 CNHW인지 그런건가?
         :param padding: Convolution padding.
-        :param dropout_ratio: The dropout ratio after each convolution layer.
+        :param dropout_ratio: The dropout ratio after each convolution layer. #dropout 비율
         :param **kwargs: Not used.
         """
         super(Unet, self).__init__()
@@ -249,22 +269,27 @@ class Unet(tf.keras.Model):
             heatmap_layer_kernel_initializer = tf.keras.initializers.TruncatedNormal(stddev=0.0001)
         else:
             heatmap_layer_kernel_initializer = he_initializer
+
+        #u-net을 UnetAvgLinear3D로 지정해주기
         self.unet = UnetAvgLinear3D(num_filters_base=num_filters_base, num_levels=num_levels, kernel_initializer=he_initializer, activation=activation_fn, dropout_ratio=dropout_ratio, data_format=data_format, padding=padding)
+        
+        #예측하는 부분? 3D Conv = activation으로 구성됨.
         self.prediction = Sequential([Conv3D(num_labels, [1] * 3, name='prediction', kernel_initializer=heatmap_layer_kernel_initializer, activation=None, data_format=data_format, padding=padding),
                                       Activation(None, dtype='float32', name='prediction')])
-        self.single_output = num_labels == 1
+        self.single_output = num_labels == 1 #output이 하나라면 True가 된다.
 
     def call(self, inputs, training, **kwargs):
         """
         Call model.
         :param inputs: Input tensors.
-        :param training: If True, use training mode, otherwise testing mode.
+        :param training: If True, use training mode, otherwise testing mode. #Train인지 test인지 여부 (boolean)
         :param kwargs: Not used.
         :return: prediction
         """
         node = self.unet(inputs, training=training)
         prediction = self.prediction(node, training=training)
-        if self.single_output:
+
+        if self.single_output: #이부분은 왜지? 
             return prediction
         else:
             return prediction, prediction, prediction

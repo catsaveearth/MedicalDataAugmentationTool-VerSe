@@ -31,3 +31,4 @@ If you use this code for your research, please cite our [paper](https://doi.org/
 
 ## 이 fork 문서의 목적
 그냥 한국말로 주석 달면서 코드 파악 + tensorflow&keras 문법 익히기
+(2020ver만 분석함)
